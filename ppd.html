@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Restaurante QR</title>
+<style>
+:root{--bg:#faf7f2;--card:#fff;--tx:#2a2420;--mut:#7a6f66;--ac:#c2410c;--ln:#e8e0d6;--ok:#15803d;--wa:#b45309;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1917;--card:#292524;--tx:#f5f0ea;--mut:#a8a29e;--ac:#fb923c;--ln:#3d3835;--ok:#4ade80;--wa:#fbbf24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1c1917;--card:#292524;--tx:#f5f0ea;--mut:#a8a29e;--ac:#fb923c;--ln:#3d3835;--ok:#4ade80;--wa:#fbbf24;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:18px 0 8px}
+.mut{color:var(--mut);font-size:14px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:12px;margin:8px 0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+button,a.b{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer;text-decoration:none;display:inline-block}
+button.g{background:transparent;color:var(--tx);border:1px solid var(--ln)}
+button.q{width:34px;padding:6px 0}
+input{font:inherit;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--card);color:var(--tx);width:120px}
+.tag{font-size:12px;border-radius:99px;padding:2px 10px;border:1px solid var(--ln)}
+.Nuevo{color:var(--wa)}.Preparando{color:var(--ac)}.Listo{color:var(--ok)}.Entregado{color:var(--mut)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+textarea{font:inherit;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--card);color:var(--tx);width:100%;box-sizing:border-box;margin-top:6px}
+.note{margin-top:6px;padding:6px 10px;border-radius:8px;border:1px dashed var(--wa);color:var(--wa);font-size:14px}
+.open{cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+ul{margin:8px 0 0;padding-left:20px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const MENU=[
+{id:1,n:"Tacos al pastor (3)",c:"Platos",p:95},{id:2,n:"Enchiladas verdes",c:"Platos",p:120},
+{id:3,n:"Hamburguesa de la casa",c:"Platos",p:140},{id:4,n:"Ensalada fresca",c:"Platos",p:85},
+{id:5,n:"Agua de jamaica",c:"Bebidas",p:35},{id:6,n:"Refresco",c:"Bebidas",p:30},
+{id:7,n:"Cerveza",c:"Bebidas",p:50},{id:8,n:"Flan casero",c:"Postres",p:60}];
+const ESTADOS=["Nuevo","Preparando","Listo","Entregado"];
+let cart={},mm="",nota="",abiertos={},nMesas=3,orders=load(),agot=loadA();
+function load(){try{return JSON.parse(localStorage.getItem("qr_orders")||"[]")}catch(e){return[]}}
+function save(){try{localStorage.setItem("qr_orders",JSON.stringify(orders))}catch(e){}}
+function loadA(){try{return JSON.parse(localStorage.getItem("qr_agot")||"[]")}catch(e){return[]}}
+function saveA(){try{localStorage.setItem("qr_agot",JSON.stringify(agot))}catch(e){}}
+addEventListener("storage",()=>{orders=load();agot=loadA();render()});
+function sync(){cart={};nota="";const x=location.hash.match(/^#mesero-(\d+)$/);if(x)mm=x[1];render()}
+addEventListener("hashchange",sync);
+const money=n=>"$"+n;
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const noteLine=o=>o.nota?'<div class="note">📝 '+esc(o.nota)+'</div>':"";
+function notaHTML(){return '<div class="card"><b>Nota para cocina</b> <span class="mut">(puedes enviarla sola)</span><textarea rows="2" placeholder="Ej. sin cebolla, alergia a las nueces…" oninput="upNota(this.value)">'+esc(nota)+'</textarea></div>'}
+const tot=l=>l.reduce((s,o)=>s+o.items.reduce((a,i)=>a+i.p*i.q,0),0);
+const byMesa=m=>orders.filter(o=>o.mesa==m);
+function cartItems(){return MENU.filter(i=>cart[i.id]&&!agot.includes(i.id)).map(i=>({n:i.n,p:i.p,q:cart[i.id]}))}
+function chg(id,d){cart[id]=Math.max(0,(cart[id]||0)+d);render()}
+function send(mesa){
+ const items=cartItems();if((!items.length&&!nota.trim())||!mesa)return;
+ const id=orders.reduce((m,o)=>Math.max(m,o.id),100)+1;
+ orders.push({id,mesa:String(mesa),items,nota:nota.trim(),estado:"Nuevo"});nota="";
+ cart={};save();render()}
+function tog(id){abiertos[id]=!abiertos[id];render()}
+function canSend(){return cartItems().length>0||nota.trim().length>0}
+function upNota(v){nota=v;document.querySelectorAll(".snd").forEach(b=>b.disabled=!canSend())}
+function toggleAgot(id){agot=agot.includes(id)?agot.filter(x=>x!==id):[...agot,id];saveA();render()}
+function detalle(o){if(!o.items.length)return '<div class="mut">Solo nota, sin artículos</div>';return abiertos[o.id]?'<ul>'+o.items.map(i=>'<li><b>'+i.q+'×</b> '+i.n+'</li>').join("")+'</ul>':'<div class="mut">'+o.items.reduce((s,i)=>s+i.q,0)+' artículos · toca para ver el detalle</div>'}
+function stockHTML(){return '<h2>Disponibilidad del menú</h2><div class="mut">Toca un platillo cuando se acabe para que ya no lo puedan pedir.</div>'+MENU.map(i=>{const a=agot.includes(i.id);return '<div class="card row"><span>'+i.n+'</span><button class="'+(a?'':'g')+'" onclick="toggleAgot('+i.id+')">'+(a?'Agotado · reactivar':'Marcar agotado')+'</button></div>'}).join("")}
+let BASE=(()=>{try{const s=localStorage.getItem("qr_base");if(s)return s}catch(e){}return /claude/.test(location.hostname)||!/^https?:$/.test(location.protocol)?"https://claude.ai/artifact/8AnkhqyoSS52UPv8vJDmj6":location.origin+location.pathname})();
+function setBase(v){v=v.trim().replace(/#.*$/,"");if(v){BASE=v;try{localStorage.setItem("qr_base",v)}catch(e){}}render()}
+function qrHTML(){let h='<h2>Códigos QR de las mesas</h2><div class="card"><div class="mut">Uno por mesa. Cada código abre la vista de esa mesa.</div><p>Dirección pública de tu página: <input style="width:100%" value="'+esc(BASE)+'" onchange="setBase(this.value)"></p><p>Número de mesas: <input type="number" min="1" max="30" value="'+nMesas+'" onchange="nMesas=Math.min(30,Math.max(1,+this.value||1));render()"></p><div class="cols">';for(let n=1;n<=nMesas;n++)h+='<div style="text-align:center"><div class="qr" data-url="'+BASE+'#cliente-'+n+'" style="background:#fff;padding:8px;border-radius:8px;display:inline-block"></div><div><b>Mesa '+n+'</b></div></div>';return h+'</div></div>'}
+function drawQR(){if(!window.QRCode)return;document.querySelectorAll(".qr").forEach(el=>{el.innerHTML="";try{new QRCode(el,{text:el.dataset.url,width:140,height:140})}catch(e){}})}
+function setEstado(id,e){const o=orders.find(x=>x.id==id);if(o){o.estado=e;save();render()}}
+function join(){
+ const v=document.getElementById("j").value.trim();if(!v)return;
+ const o=orders.find(x=>String(x.id)===v);
+ location.hash="cliente-"+(o?o.mesa:v)}
+function menuHTML(){
+ let h="",cat="";
+ MENU.forEach(i=>{
+  if(i.c!==cat){cat=i.c;h+="<h2>"+cat+"</h2>"}
+  if(agot.includes(i.id)){h+='<div class="card row" style="opacity:.6"><div>'+i.n+'<div class="mut">'+money(i.p)+'</div></div><span class="tag Nuevo">Agotado</span></div>';return}
+  h+='<div class="card row"><div>'+i.n+'<div class="mut">'+money(i.p)+'</div></div><div class="row">'+
+  '<button class="g q" onclick="chg('+i.id+',-1)">−</button><b>'+(cart[i.id]||0)+'</b>'+
+  '<button class="q" onclick="chg('+i.id+',1)">+</button></div></div>'});
+ return h}
+function itemsTxt(o){return o.items.length?o.items.map(i=>i.q+"× "+i.n).join(", "):"Solo nota"}
+function ordHTML(o,extra){return '<div class="card"><div class="row"><b>Pedido #'+o.id+(extra?" · Mesa "+o.mesa:"")+
+ '</b><span class="tag '+o.estado+'">'+o.estado+'</span></div><div class="mut">'+itemsTxt(o)+'</div>'+noteLine(o)+'</div>'}
+function nav(){return '<nav><a class="b" href="#">Inicio</a></nav>'}
+
+function home(){return '<h1>Restaurante QR</h1><p class="mut">Prototipo de demostración. Abre cada vista en una pestaña distinta del mismo navegador para ver cómo se sincronizan.</p>'+
+ '<div class="card"><b>Cliente</b><div class="mut">Es lo que se abre al escanear el QR de la mesa.</div><p><a class="b" href="#cliente-1">Mesa 1</a> <a class="b" href="#cliente-2">Mesa 2</a> <a class="b" href="#cliente-3">Mesa 3</a></p></div>'+
+ '<div class="card"><b>Mesero</b><div class="mut">Toma pedidos para una mesa y marca entregas.</div><p><a class="b" href="#mesero">Abrir</a></p></div>'+
+ '<div class="card"><b>Cocina</b><div class="mut">Recibe pedidos y cambia su estatus.</div><p><a class="b" href="#cocina">Abrir</a></p></div>'+qrHTML()+
+ '<p><button class="g" onclick="if(confirm(\'¿Borrar todos los pedidos?\')){orders=[];save();render()}">Reiniciar demo</button></p>'}
+
+function cliente(m){
+ const list=byMesa(m),c=cartItems(),ct=c.reduce((s,i)=>s+i.p*i.q,0);
+ return '<nav><button class="g" onclick="location.hash=\'mesero-'+m+'\'">Soy mesero</button></nav><h1>Mesa '+m+'</h1><div class="mut">Cuenta de la mesa: <b>'+money(tot(list))+'</b></div>'+
+ '<div class="card"><b>¿Llegaste después?</b><div class="mut">Escribe el número de mesa o de pedido para unirte a esa cuenta.</div><p class="row" style="justify-content:flex-start"><input id="j" placeholder="Mesa o pedido" inputmode="numeric"><button onclick="join()">Unirme</button></p></div>'+
+ (list.length?'<h2>Pedidos de la mesa</h2>'+list.map(o=>ordHTML(o)).join(""):"")+
+ '<h2>Menú</h2>'+menuHTML()+notaHTML()+
+ '<div class="card row"><b>Tu pedido: '+money(ct)+'</b><button class="snd" '+(canSend()?"":"disabled")+' onclick="send('+m+')">Enviar a cocina</button></div>'}
+
+function mesero(){
+ const c=cartItems(),ct=c.reduce((s,i)=>s+i.p*i.q,0);
+ const mesas=[...new Set(orders.map(o=>o.mesa))].sort((a,b)=>a-b);
+ let h='<nav><a class="b" href="#">Inicio</a>'+(mm?'<a class="b" href="#cliente-'+mm+'">Vista de mesa '+mm+'</a>':"")+'</nav><h1>Mesero</h1><h2>Mesas con cuenta abierta</h2>';
+ h+=mesas.length?mesas.map(m=>{const l=byMesa(m);return '<div class="card"><div class="row"><b>Mesa '+m+'</b><b>'+money(tot(l))+'</b></div>'+
+  l.map(o=>'<div class="row mut"><span>#'+o.id+' · '+itemsTxt(o)+(o.nota?' · 📝 '+esc(o.nota):"")+'</span><span class="row"><span class="tag '+o.estado+'">'+o.estado+'</span>'+
+  (o.estado==="Listo"?'<button onclick="setEstado('+o.id+',\'Entregado\')">Entregar</button>':"")+'</span></div>').join("")+'</div>'}).join(""):'<div class="mut">Aún no hay pedidos.</div>';
+ h+='<h2>Tomar pedido</h2><div class="card">Mesa: <input id="mm" value="'+mm+'" inputmode="numeric" oninput="mm=this.value"></div>'+menuHTML()+notaHTML()+
+ '<div class="card row"><b>Total: '+money(ct)+'</b><button class="snd" '+(canSend()?"":"disabled")+' onclick="send(mm)">Enviar a cocina</button></div>';
+ return h}
+
+function cocina(){
+ const col=(e,sig,lbl)=>'<div><h2>'+(e==="Preparando"?"En preparación":e==="Nuevo"?"Nuevos":"Listos")+'</h2>'+
+  (orders.filter(o=>o.estado===e).map(o=>'<div class="card open" onclick="tog('+o.id+')"><div class="row"><b>#'+o.id+' · Mesa '+o.mesa+'</b><span class="mut">'+(abiertos[o.id]?'▲':'▼')+'</span></div>'+noteLine(o)+detalle(o)+
+  (sig?'<p><button onclick="event.stopPropagation();setEstado('+o.id+',\''+sig+'\')">'+lbl+'</button></p>':'<p class="mut">Esperando al mesero</p>')+'</div>').join("")||'<div class="mut">Sin pedidos</div>')+'</div>';
+ return nav()+'<h1>Cocina</h1><div class="cols">'+col("Nuevo","Preparando","Empezar")+col("Preparando","Listo","Marcar listo")+col("Listo",null)+'</div>'+stockHTML()}
+
+function render(){
+ const r=location.hash.slice(1),el=document.getElementById("app");
+ const m=r.match(/^cliente-(\d+)$/);
+ el.innerHTML=m?cliente(m[1]):/^mesero(-\d+)?$/.test(r)?mesero():r==="cocina"?cocina():home();if(!m&&!/^(mesero|cocina)/.test(r))drawQR()}
+sync();
+</script>
+</body>
+</html>
